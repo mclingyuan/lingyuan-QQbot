@@ -154,6 +154,12 @@ setInterval(() => {
   for (const [k, t] of seen) if (now - t > cfg.dedupe.ttlMs) seen.delete(k);
 }, cfg.dedupe.sweepMs).unref();
 
+// 🆕 2026-10-22 插件热重载：配合插件市场（pluginmarket.js）装完插件后，
+//    ~20s 内自动生效，不用重启服务。目录没变化时开销约等于一次 readdir。
+setInterval(() => {
+  try { plugins.reloadIfChanged(); } catch (e) { console.warn('[plugins] 热重载检查失败:', e.message); }
+}, 20000).unref();
+
 // ---------- 落盘（调试阶段最有用的东西）----------
 function logEvent(type, d) {
   try {

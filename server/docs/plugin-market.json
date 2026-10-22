@@ -1,0 +1,24 @@
+{
+  "name": "lingyuan-plugin-market-sample",
+  "desc": "内置样例市场索引 —— 字段名与 AstrBot 插件市场对齐；把远程索引 URL 加到 WebUI 即可替换/追加",
+  "plugins": [
+    {
+      "name": "astrbot_plugin_hello",
+      "display_name": "你好插件（目录式示例）",
+      "short_desc": "目录式插件的最小可运行示例：metadata.yaml + main.js",
+      "desc": "演示本插件系统的目录式插件结构。安装后群里发 #hello 验证。",
+      "version": "1.0.0",
+      "author": "lingyuan",
+      "repo": "https://github.com/your-name/astrbot_plugin_hello"
+    },
+    {
+      "name": "astrbot_plugin_menu",
+      "display_name": "菜单增强（占位示例）",
+      "short_desc": "占位卡片：展示市场卡片的字段渲染效果",
+      "desc": "这是样例索引里的占位条目，repo 指向一个不存在的仓库，点安装会失败 —— 换成你自己的 git 仓库地址就能真装。",
+      "version": "0.0.1",
+      "author": "lingyuan",
+      "repo": "https://github.com/your-name/astrbot_plugin_menu"
+    }
+  ]
+}

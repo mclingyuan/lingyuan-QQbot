@@ -688,6 +688,11 @@ a{color:var(--ac);text-decoration:none}
 <input id="word" placeholder="要屏蔽的词" style="flex:1;min-width:150px"><button onclick="addWord()">添加</button></div>
 <div id="words"></div></div>
 <div class="card"><b>定时任务</b><div id="jobs"></div></div>
+<div class="card"><b>🧩 插件市场</b>（规范向 AstrBot 对齐：目录式插件 = metadata.yaml + main.js；装完 ~20s 内自动生效）<div id="mk"></div>
+<div class="k" style="margin:4px 0">本地插件：</div><div id="localpk"></div>
+<div class="row"><input id="repo" placeholder="git 仓库地址（或本地路径，测试用）" style="flex:1;min-width:260px"><button onclick="installRepo()">安装</button><button onclick="reloadPlugins()" style="background:#2a3550">全部重载</button></div>
+<div class="row"><input id="srcUrl" placeholder="自定义市场索引 JSON 地址（可选）" style="flex:1;min-width:260px"><button onclick="addSource()" style="background:#2a3550">加索引源</button></div>
+<div class="k" id="mksrc"></div></div>
 <script>
 const P = '${pwd.replace(/[<>&'"]/g, '')}';
 const MODS = [['kb','📚 知识库'],['context','🧠 上下文'],['scheduler','⏰ 定时任务'],['plugins','🧩 插件'],['mod','🛡 限流'],['persona','🎭 分群人格'],['tts','🔊 TTS'],['stt','🎙 STT']];
@@ -723,7 +728,36 @@ async function load() {
 async function setLimit() { const scope = document.getElementById('scope').value.trim(), n = +document.getElementById('n').value; await fetch('/api/x/limit?p=' + P, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scope, n }) }); load(); }
 async function addWord() { const word = document.getElementById('word').value.trim(); if (!word) return; await fetch('/api/x/banned?p=' + P, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'add', word }) }); document.getElementById('word').value = ''; load(); }
 async function delWord(word) { await fetch('/api/x/banned?p=' + P, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'remove', word }) }); load(); }
+
+// ---------- 🆕 插件市场 ----------
+function esc(s) { return String(s == null ? '' : s).replace(/[<>&"]/g, ''); }
+async function mkPost(body) {
+  const r = await (await fetch('/api/x/market?p=' + P, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json();
+  if (!r.ok) alert('失败：' + (r.why || '未知错误'));
+  return r;
+}
+async function loadMarket() {
+  try {
+    const j = await (await fetch('/api/x/market?p=' + P)).json();
+    if (!j.ok) { document.getElementById('mk').innerHTML = '<span class="k">加载失败</span>'; return; }
+    document.getElementById('mk').innerHTML = j.fallback
+      ? '<span class="k">⚠️ ' + esc(j.why) + '</span>'
+      : '<span class="k">✓ 市场加载正常（' + j.plugins.length + ' 个可装）</span>';
+    document.getElementById('localpk').innerHTML = (j.local || []).length
+      ? j.local.map(p => '<span class="w" title="' + esc(p.file) + '">' + esc(p.meta.display_name || p.name) + (p.meta.version ? ' v' + esc(p.meta.version) : '')
+        + (p.dir ? ' <a href="javascript:void(0)" onclick="uninstallPk(\\'' + esc(p.dir) + '\\')" style="color:#f87171">卸载</a>' : '') + '</span>').join('')
+      : '<span class="k">（还没装任何目录式插件）</span>';
+    document.getElementById('mksrc').innerHTML = '索引源：' + ((j.sources || []).length ? j.sources.map(esc).join('、') : '（无，展示内置样例）');
+  } catch (e) {
+    document.getElementById('mk').innerHTML = '<span class="k">市场接口异常：' + esc(e.message) + '</span>';
+  }
+}
+async function installRepo() { const v = document.getElementById('repo').value.trim(); if (!v) return; await mkPost({ op: 'install', repo: v }); document.getElementById('repo').value = ''; loadMarket(); }
+async function uninstallPk(name) { if (!confirm('卸载插件 ' + name + '？（旧版会备份到 data/plugin-backups/）')) return; await mkPost({ op: 'uninstall', name }); loadMarket(); }
+async function reloadPlugins() { await mkPost({ op: 'reload' }); loadMarket(); }
+async function addSource() { const v = document.getElementById('srcUrl').value.trim(); if (!v) return; await mkPost({ op: 'addSource', url: v }); document.getElementById('srcUrl').value = ''; loadMarket(); }
 load();
+loadMarket();
 </script></body></html>`;
 }
 
@@ -1312,6 +1346,45 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ ok: true, n }));
     } catch (e) { res.writeHead(400); res.end(JSON.stringify({ ok: false, why: e.message })); }
+    return;
+  }
+
+  // ============================================================
+  //  🆕 2026-10-22 插件市场（/api/x/market）—— 规范向 AstrBot 对齐
+  //  GET  = 本地插件 + 市场卡片列表 + 索引源
+  //  POST = install / uninstall / reload / addSource / delSource
+  // ============================================================
+  if (url.pathname === '/api/x/market' && req.method === 'GET') {
+    try {
+      const market = require('../pluginmarket');
+      const mk = await market.listMarket();
+      const local = require('../plugins').listPlugins();
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({
+        ok: true, local,
+        plugins: mk.plugins, sources: mk.sources, fallback: mk.fallback, why: mk.why,
+      }));
+    } catch (e) {
+      res.writeHead(500); res.end(JSON.stringify({ ok: false, why: e.message }));
+    }
+    return;
+  }
+  if (url.pathname === '/api/x/market' && req.method === 'POST') {
+    const b = JSON.parse(await readBody(req) || '{}');
+    try {
+      const market = require('../pluginmarket');
+      let out;
+      if (b.op === 'install') out = await market.install(b.repo);
+      else if (b.op === 'uninstall') out = market.uninstall(b.name);
+      else if (b.op === 'reload') out = { ok: true, reloaded: require('../plugins').load().length };
+      else if (b.op === 'addSource') out = { ok: true, sources: market.setSources([...market.getSources(), b.url]) };
+      else if (b.op === 'delSource') out = { ok: true, sources: market.setSources(market.getSources().filter((u) => u !== String(b.url))) };
+      else throw new Error(`未知操作：${b.op}`);
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(out));
+    } catch (e) {
+      res.writeHead(400); res.end(JSON.stringify({ ok: false, why: e.message }));
+    }
     return;
   }
   if (url.pathname === '/x') {

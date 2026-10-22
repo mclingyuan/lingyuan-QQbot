@@ -1,0 +1,16 @@
+# ============================================================
+#  metadata.yaml —— 与 AstrBot 插件规范同字段（本插件系统只认 JS，不跑 Python）
+#  name 必须与目录名一致；插件市场按 repo 字段做 git clone 安装
+# ============================================================
+name: astrbot_plugin_hello
+display_name: 你好插件（目录式示例）
+desc: |
+  目录式插件示范：演示 metadata.yaml + main.js 的 AstrBot 风格插件结构。
+  装进 server/plugins/ 即自动加载；删掉目录即下线。
+short_desc: 目录式插件的最小可运行示例
+version: 1.0.0
+author: lingyuan
+repo: https://github.com/lingyuan/astrbot_plugin_hello
+tags:
+  - 示例
+  - 插件市场
